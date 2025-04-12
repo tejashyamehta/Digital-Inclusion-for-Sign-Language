@@ -1,0 +1,74 @@
+body {
+  font-family: Arial, sans-serif;
+  background: #f0f4f8;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  height: 100vh;
+}
+
+.container {
+  margin-top: 20px;
+  text-align: center;
+  max-width: 800px;
+  width: 100%;
+}
+
+h1 {
+  margin-bottom: 20px;
+  color: #333;
+}
+
+.camera-section video {
+  border: 2px solid #444;
+  width: 100%;
+  max-width: 640px;
+  height: auto;
+  border-radius: 12px;
+}
+
+.output-section {
+  margin-top: 20px;
+}
+
+.block {
+  margin: 10px 0;
+}
+
+.text-box {
+  padding: 15px;
+  border: 2px solid #007bff;
+  border-radius: 10px;
+  font-size: 20px;
+  background: #fff;
+  color: #222;
+}
+
+.suggestion-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.suggestion {
+  padding: 10px 20px;
+  font-size: 16px;
+  border-radius: 8px;
+  border: 1px solid #007bff;
+  background-color: #e6f0ff;
+  cursor: pointer;
+}
+
+.buttons button {
+  margin: 10px;
+  padding: 12px 24px;
+  font-size: 16px;
+  background-color: #007bff;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+}

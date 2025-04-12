@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Sign2Text Web App</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f2f2f2;
+      text-align: center;
+      padding: 20px;
+    }
+    h1 {
+      color: #333;
+    }
+    video, img {
+      border: 2px solid #555;
+      border-radius: 8px;
+      margin-top: 10px;
+    }
+    #output {
+      margin-top: 20px;
+    }
+    .box {
+      border: 2px solid #007BFF;
+      padding: 15px;
+      margin: 10px auto;
+      width: 60%;
+      background: #fff;
+      border-radius: 10px;
+      font-size: 1.2em;
+    }
+    .btn {
+      padding: 10px 20px;
+      margin: 10px 5px;
+      font-size: 16px;
+      border: none;
+      border-radius: 6px;
+      background-color: #007BFF;
+      color: white;
+      cursor: pointer;
+    }
+    .btn:hover {
+      background-color: #0056b3;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Sign Language to Text</h1>
+
+  <img id="videoFeed" src="/video_feed" width="600" height="450" />
+
+  <div id="output">
+    <div class="box">
+      <strong>Predicted Character:</strong> <span id="char">-</span>
+    </div>
+    <div class="box">
+      <strong>Sentence:</strong> <span id="sentence"></span>
+    </div>
+    <div class="box">
+      <strong>Suggestions:</strong><br/>
+      <button class="btn" id="sug1"></button>
+      <button class="btn" id="sug2"></button>
+      <button class="btn" id="sug3"></button>
+      <button class="btn" id="sug4"></button>
+    </div>
+    <div>
+      <button class="btn" id="speak">🔊 Speak</button>
+      <button class="btn" id="clear">🗑️ Clear</button>
+    </div>
+  </div>
+
+  <script>
+  // Update predictions every second
+  function fetchPrediction() {
+    fetch("/get_prediction")
+      .then((response) => response.json())
+      .then((data) => {
+        document.getElementById("char").textContent = data.char || "-"
+        document.getElementById("sentence").textContent = data.sentence || ""
+        document.getElementById("sug1").textContent = data.suggestions[0] || ""
+        document.getElementById("sug2").textContent = data.suggestions[1] || ""
+        document.getElementById("sug3").textContent = data.suggestions[2] || ""
+        document.getElementById("sug4").textContent = data.suggestions[3] || ""
+      })
+      .catch((err) => console.error("Prediction fetch error:", err))
+  }
+
+  // Speak the sentence
+  document.getElementById("speak").addEventListener("click", () => {
+    fetch("/speak", { method: "POST" })
+  })
+
+  // Clear the sentence and UI
+  document
+    .getElementById("clear")
+    .addEventListener("click", () => {
+      fetch("/clear", { method: "POST" }).then(() => {
+        document.getElementById("char").textContent = "-"
+        document.getElementById("sentence").textContent = ""
+        ;["sug1", "sug2", "sug3", "sug4"].forEach((id) => {
+          document.getElementById(id).textContent = ""
+        })
+      })
+    })
+
+  // Suggestion buttons: add selected word to sentence
+  ;["sug1", "sug2", "sug3", "sug4"].forEach((id) => {
+    document.getElementById(id).addEventListener("click", () => {
+      const word = document.getElementById(id).textContent
+      if (word) {
+        fetch("/get_prediction")
+          .then((response) => response.json())
+          .then((data) => {
+            const sentence = data.sentence.trim()
+            const parts = sentence.split(" ")
+            parts[parts.length - 1] = word
+            const updated = parts.join(" ") + " "
+            fetch("/clear", { method: "POST" }).then(() => {
+              document.getElementById("sentence").textContent = updated
+              // Update on backend too (optional)
+            })
+          })
+      }
+    })
+  })
+
+  // Start polling predictions
+  setInterval(fetchPrediction, 1000)
+  </script>
+</body>
+</html>
