@@ -1,4 +1,4 @@
-from flask import Flask, Response, render_template, jsonify, request, send_from_directory
+from flask import Flask, Response, render_template, jsonify, request, send_from_directory, redirect, url_for
 import cv2
 import numpy as np
 import os
@@ -6,6 +6,7 @@ import time
 import pyttsx3
 import threading
 import enchant
+import queue
 
 # Initialize dictionary for word suggestions
 dictionary = enchant.Dict("en-US")
@@ -35,8 +36,49 @@ prev_char = ""
 count = -1
 ten_prev_char = [" " for _ in range(10)]
 
+# Create a queue for TTS commands to avoid resource issues
+tts_queue = queue.Queue()
+tts_thread_running = False
+
 # Initialize text-to-speech engine
-engine = pyttsx3.init()
+def init_tts_engine():
+    engine = pyttsx3.init()
+    engine.setProperty('rate', 150)  # Adjust speed
+    voices = engine.getProperty('voices')
+    if voices:
+        engine.setProperty('voice', voices[0].id)  # Use first available voice
+    return engine
+
+# TTS worker thread function
+def tts_worker():
+    global tts_thread_running
+    tts_thread_running = True
+    
+    while True:
+        try:
+            text = tts_queue.get(timeout=1)  # Wait for 1 second for a new item
+            if text == "STOP":
+                break
+                
+            engine = init_tts_engine()
+            engine.say(text)
+            engine.runAndWait()
+            
+            # Clean up
+            engine.stop()
+            del engine
+            
+            tts_queue.task_done()
+        except queue.Empty:
+            continue
+        except Exception as e:
+            print(f"TTS error: {e}")
+    
+    tts_thread_running = False
+
+# Start TTS worker thread
+tts_thread = threading.Thread(target=tts_worker, daemon=True)
+tts_thread.start()
 
 # Load model function
 def load_model():
@@ -130,7 +172,7 @@ def predict_sign(frame, model=None):
                 # Prepare image for prediction
                 white_resized = white.reshape(1, 400, 400, 3)
                 
-                # Make prediction
+                # Make prediction - directly following the GUI app's approach
                 prob = np.array(model.predict(white_resized, verbose=0)[0], dtype='float32')
                 ch1 = np.argmax(prob, axis=0)
                 prob[ch1] = 0
@@ -140,9 +182,6 @@ def predict_sign(frame, model=None):
                 prob[ch3] = 0
                 
                 pl = [ch1, ch2]
-                
-                # Implement the same prediction logic as in the GUI app
-                # This is a simplified version of the complex logic in the original code
                 
                 # condition for [Aemnst]
                 l = [[5, 2], [5, 3], [3, 5], [3, 6], [3, 0], [3, 2], [6, 4], [6, 1], [6, 2], [6, 6], [6, 7], [6, 0], [6, 5],
@@ -157,7 +196,6 @@ def predict_sign(frame, model=None):
                 if pl in l:
                     if (pts[5][0] < pts[4][0]):
                         ch1 = 0
-                        print("++++++++++++++++++")
                 
                 # condition for [c0][aemnst]
                 l = [[0, 0], [0, 6], [0, 2], [0, 5], [0, 1], [0, 7], [5, 2], [7, 6], [7, 1]]
@@ -173,6 +211,236 @@ def predict_sign(frame, model=None):
                 if pl in l:
                     if distance(pts[8], pts[16]) < 52:
                         ch1 = 2
+                
+                # condition for [gh][bdfikruvw]
+                l = [[1, 4], [1, 5], [1, 6], [1, 3], [1, 0]]
+                pl = [ch1, ch2]
+                if pl in l:
+                    if pts[6][1] > pts[8][1] and pts[14][1] < pts[16][1] and pts[18][1] < pts[20][1] and pts[0][0] < pts[8][0] and pts[0][0] < pts[12][0] and pts[0][0] < pts[16][0] and pts[0][0] < pts[20][0]:
+                        ch1 = 3
+                
+                # con for [gh][l]
+                l = [[4, 6], [4, 1], [4, 5], [4, 3], [4, 7]]
+                pl = [ch1, ch2]
+                if pl in l:
+                    if pts[4][0] > pts[0][0]:
+                        ch1 = 3
+                
+                # con for [gh][pqz]
+                l = [[5, 3], [5, 0], [5, 7], [5, 4], [5, 2], [5, 1], [5, 5]]
+                pl = [ch1, ch2]
+                if pl in l:
+                    if pts[2][1] + 15 < pts[16][1]:
+                        ch1 = 3
+                
+                # con for [l][x]
+                l = [[6, 4], [6, 1], [6, 2]]
+                pl = [ch1, ch2]
+                if pl in l:
+                    if distance(pts[4], pts[11]) > 55:
+                        ch1 = 4
+                
+                # con for [l][d]
+                l = [[1, 4], [1, 6], [1, 1]]
+                pl = [ch1, ch2]
+                if pl in l:
+                    if (distance(pts[4], pts[11]) > 50) and (
+                            pts[6][1] > pts[8][1] and pts[10][1] < pts[12][1] and pts[14][1] < pts[16][1] and pts[18][1] <
+                            pts[20][1]):
+                        ch1 = 4
+                
+                # con for [l][gh]
+                l = [[3, 6], [3, 4]]
+                pl = [ch1, ch2]
+                if pl in l:
+                    if (pts[4][0] < pts[0][0]):
+                        ch1 = 4
+                
+                # con for [l][c0]
+                l = [[2, 2], [2, 5], [2, 4]]
+                pl = [ch1, ch2]
+                if pl in l:
+                    if (pts[1][0] < pts[12][0]):
+                        ch1 = 4
+                
+                # con for [gh][z]
+                l = [[3, 6], [3, 5], [3, 4]]
+                pl = [ch1, ch2]
+                if pl in l:
+                    if (pts[6][1] > pts[8][1] and pts[10][1] < pts[12][1] and pts[14][1] < pts[16][1] and pts[18][1] < pts[20][1]) and pts[4][1] > pts[10][1]:
+                        ch1 = 5
+                
+                # con for [gh][pq]
+                l = [[3, 2], [3, 1], [3, 6]]
+                pl = [ch1, ch2]
+                if pl in l:
+                    if pts[4][1] + 17 > pts[8][1] and pts[4][1] + 17 > pts[12][1] and pts[4][1] + 17 > pts[16][1] and pts[4][1] + 17 > pts[20][1]:
+                        ch1 = 5
+                
+                # con for [l][pqz]
+                l = [[4, 4], [4, 5], [4, 2], [7, 5], [7, 6], [7, 0]]
+                pl = [ch1, ch2]
+                if pl in l:
+                    if pts[4][0] > pts[0][0]:
+                        ch1 = 5
+                
+                # con for [pqz][aemnst]
+                l = [[0, 2], [0, 6], [0, 1], [0, 5], [0, 0], [0, 7], [0, 4], [0, 3], [2, 7]]
+                pl = [ch1, ch2]
+                if pl in l:
+                    if pts[0][0] < pts[8][0] and pts[0][0] < pts[12][0] and pts[0][0] < pts[16][0] and pts[0][0] < pts[20][0]:
+                        ch1 = 5
+                
+                # con for [pqz][yj]
+                l = [[5, 7], [5, 2], [5, 6]]
+                pl = [ch1, ch2]
+                if pl in l:
+                    if pts[3][0] < pts[0][0]:
+                        ch1 = 7
+                
+                # con for [l][yj]
+                l = [[4, 6], [4, 2], [4, 4], [4, 1], [4, 5], [4, 7]]
+                pl = [ch1, ch2]
+                if pl in l:
+                    if pts[6][1] < pts[8][1]:
+                        ch1 = 7
+                
+                # con for [x][yj]
+                l = [[6, 7], [0, 7], [0, 1], [0, 0], [6, 4], [6, 6], [6, 5], [6, 1]]
+                pl = [ch1, ch2]
+                if pl in l:
+                    if pts[18][1] > pts[20][1]:
+                        ch1 = 7
+                
+                # condition for [x][aemnst]
+                l = [[0, 4], [0, 2], [0, 3], [0, 1], [0, 6]]
+                pl = [ch1, ch2]
+                if pl in l:
+                    if pts[5][0] > pts[16][0]:
+                        ch1 = 6
+                
+                # condition for [yj][x]
+                l = [[7, 2]]
+                pl = [ch1, ch2]
+                if pl in l:
+                    if pts[18][1] < pts[20][1] and pts[8][1] < pts[10][1]:
+                        ch1 = 6
+                
+                # condition for [c0][x]
+                l = [[2, 1], [2, 2], [2, 6], [2, 7], [2, 0]]
+                pl = [ch1, ch2]
+                if pl in l:
+                    if distance(pts[8], pts[16]) > 50:
+                        ch1 = 6
+                
+                # con for [l][x]
+                l = [[4, 6], [4, 2], [4, 1], [4, 4]]
+                pl = [ch1, ch2]
+                if pl in l:
+                    if distance(pts[4], pts[11]) < 60:
+                        ch1 = 6
+                
+                # con for [x][d]
+                l = [[1, 4], [1, 6], [1, 0], [1, 2]]
+                pl = [ch1, ch2]
+                if pl in l:
+                    if pts[5][0] - pts[4][0] - 15 > 0:
+                        ch1 = 6
+                
+                # con for [b][pqz]
+                l = [[5, 0], [5, 1], [5, 4], [5, 5], [5, 6], [6, 1], [7, 6], [0, 2], [7, 1], [7, 4], [6, 6], [7, 2], [5, 0],
+                     [6, 3], [6, 4], [7, 5], [7, 2]]
+                pl = [ch1, ch2]
+                if pl in l:
+                    if (pts[6][1] > pts[8][1] and pts[10][1] > pts[12][1] and pts[14][1] > pts[16][1] and pts[18][1] > pts[20][1]):
+                        ch1 = 1
+                
+                # con for [f][pqz]
+                l = [[6, 1], [6, 0], [0, 3], [6, 4], [2, 2], [0, 6], [6, 2], [7, 6], [4, 6], [4, 1], [4, 2], [0, 2], [7, 1],
+                     [7, 4], [6, 6], [7, 2], [7, 5], [7, 2]]
+                pl = [ch1, ch2]
+                if pl in l:
+                    if (pts[6][1] < pts[8][1] and pts[10][1] > pts[12][1] and pts[14][1] > pts[16][1] and
+                            pts[18][1] > pts[20][1]):
+                        ch1 = 1
+                
+                l = [[6, 1], [6, 0], [4, 2], [4, 1], [4, 6], [4, 4]]
+                pl = [ch1, ch2]
+                if pl in l:
+                    if (pts[10][1] > pts[12][1] and pts[14][1] > pts[16][1] and
+                            pts[18][1] > pts[20][1]):
+                        ch1 = 1
+                
+                # con for [d][pqz]
+                l = [[5, 0], [3, 4], [3, 0], [3, 1], [3, 5], [5, 5], [5, 4], [5, 1], [7, 6]]
+                pl = [ch1, ch2]
+                if pl in l:
+                    if ((pts[6][1] > pts[8][1] and pts[10][1] < pts[12][1] and pts[14][1] < pts[16][1] and
+                         pts[18][1] < pts[20][1]) and (pts[2][0] < pts[0][0]) and pts[4][1] > pts[14][1]):
+                        ch1 = 1
+                
+                l = [[4, 1], [4, 2], [4, 4]]
+                pl = [ch1, ch2]
+                if pl in l:
+                    if (distance(pts[4], pts[11]) < 50) and (
+                            pts[6][1] > pts[8][1] and pts[10][1] < pts[12][1] and pts[14][1] < pts[16][1] and pts[18][1] <
+                            pts[20][1]):
+                        ch1 = 1
+                
+                l = [[3, 4], [3, 0], [3, 1], [3, 5], [3, 6]]
+                pl = [ch1, ch2]
+                if pl in l:
+                    if ((pts[6][1] > pts[8][1] and pts[10][1] < pts[12][1] and pts[14][1] < pts[16][1] and
+                         pts[18][1] < pts[20][1]) and (pts[2][0] < pts[0][0]) and pts[14][1] < pts[4][1]):
+                        ch1 = 1
+                
+                l = [[6, 6], [6, 4], [6, 1], [6, 2]]
+                pl = [ch1, ch2]
+                if pl in l:
+                    if pts[5][0] - pts[4][0] - 15 < 0:
+                        ch1 = 1
+                
+                # con for [i][pqz]
+                l = [[5, 4], [5, 5], [5, 1], [0, 3], [0, 7], [5, 0], [0, 2], [6, 2], [7, 5], [7, 1], [7, 6], [7, 7]]
+                pl = [ch1, ch2]
+                if pl in l:
+                    if ((pts[6][1] < pts[8][1] and pts[10][1] < pts[12][1] and pts[14][1] < pts[16][1] and
+                         pts[18][1] > pts[20][1])):
+                        ch1 = 1
+                
+                # con for [yj][bfdi]
+                l = [[1, 5], [1, 7], [1, 1], [1, 6], [1, 3], [1, 0]]
+                pl = [ch1, ch2]
+                if pl in l:
+                    if (pts[4][0] < pts[5][0] + 15) and (
+                    (pts[6][1] < pts[8][1] and pts[10][1] < pts[12][1] and pts[14][1] < pts[16][1] and
+                     pts[18][1] > pts[20][1])):
+                        ch1 = 7
+                
+                # con for [uvr]
+                l = [[5, 5], [5, 0], [5, 4], [5, 1], [4, 6], [4, 1], [7, 6], [3, 0], [3, 5]]
+                pl = [ch1, ch2]
+                if pl in l:
+                    if ((pts[6][1] > pts[8][1] and pts[10][1] > pts[12][1] and pts[14][1] < pts[16][1] and
+                         pts[18][1] < pts[20][1])) and pts[4][1] > pts[14][1]:
+                        ch1 = 1
+                
+                # con for [w]
+                fg = 13
+                l = [[3, 5], [3, 0], [3, 6], [5, 1], [4, 1], [2, 0], [5, 0], [5, 5]]
+                pl = [ch1, ch2]
+                if pl in l:
+                    if not (pts[0][0] + fg < pts[8][0] and pts[0][0] + fg < pts[12][0] and pts[0][0] + fg < pts[16][0] and
+                            pts[0][0] + fg < pts[20][0]) and not (
+                            pts[0][0] > pts[8][0] and pts[0][0] > pts[12][0] and pts[0][0] > pts[16][0] and pts[0][0] > pts[20][0]) and distance(pts[4], pts[11]) < 50:
+                        ch1 = 1
+                
+                # con for [w]
+                l = [[5, 0], [5, 5], [0, 1]]
+                pl = [ch1, ch2]
+                if pl in l:
+                    if pts[6][1] > pts[8][1] and pts[10][1] > pts[12][1] and pts[14][1] > pts[16][1]:
+                        ch1 = 1
                 
                 # Map group index to character (simplified from original)
                 if ch1 == 0:
@@ -195,7 +463,8 @@ def predict_sign(frame, model=None):
                         ch1 = 'O'
                 
                 elif ch1 == 3:
-                    if (distance(pts[8], pts[12])) > 72:
+                    # Improved detection for G
+                    if (distance(pts[8], pts[12])) > 65:  # Relaxed threshold from 72 to 65
                         ch1 = 'G'
                     else:
                         ch1 = 'H'
@@ -213,13 +482,17 @@ def predict_sign(frame, model=None):
                     ch1 = 'X'
                 
                 elif ch1 == 5:
+                    # Improved detection for Z and P
                     if pts[4][0] > pts[12][0] and pts[4][0] > pts[16][0] and pts[4][0] > pts[20][0]:
-                        if pts[8][1] < pts[5][1]:
+                        # Relaxed condition for Z
+                        if pts[8][1] < pts[5][1] + 10:  # Added tolerance of 10 pixels
                             ch1 = 'Z'
                         else:
                             ch1 = 'Q'
                     else:
-                        ch1 = 'P'
+                        # Additional condition for P
+                        if pts[6][1] < pts[8][1] and pts[10][1] < pts[12][1]:
+                            ch1 = 'P'
                 
                 elif ch1 == 1:
                     if (pts[6][1] > pts[8][1] and pts[10][1] > pts[12][1] and pts[14][1] > pts[16][1] and pts[18][1] > pts[20][1]):
@@ -262,7 +535,7 @@ def predict_sign(frame, model=None):
                     if (pts[0][0] > pts[8][0] and pts[0][0] > pts[12][0] and pts[0][0] > pts[16][0] and pts[0][0] > pts[20][0]) and (pts[4][1] < pts[8][1] and pts[4][1] < pts[12][1] and pts[4][1] < pts[16][1] and pts[4][1] < pts[20][1]) and (pts[4][1] < pts[6][1] and pts[4][1] < pts[10][1] and pts[4][1] < pts[14][1] and pts[4][1] < pts[18][1]):
                         ch1 = 'Backspace'
                 
-                # Handle special characters
+                # Handle special characters - directly following the GUI app's approach
                 if ch1 == "next" and prev_char != "next":
                     if ten_prev_char[(count-2)%10] != "next":
                         if ten_prev_char[(count-2)%10] == "Backspace":
@@ -325,6 +598,10 @@ def generate_frames():
     # Get the model
     model = load_model()
     
+    # Set lower resolution for better performance
+    camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    
     while True:
         success, frame = camera.read()
         if not success:
@@ -360,6 +637,10 @@ def generate_frames():
 def index():
     return render_template('index.html')
 
+@app.route('/chart')
+def chart():
+    return render_template('chart.html')
+
 @app.route('/static/<path:path>')
 def serve_static(path):
     return send_from_directory('../frontend', path)
@@ -381,19 +662,16 @@ def get_prediction():
 
 @app.route('/speak', methods=['POST'])
 def speak_text():
-    global current_sentence
+    global current_sentence, tts_queue, tts_thread_running
     
     if current_sentence:
-        # Use a thread to avoid blocking the response
-        def speak():
-            # Create a new engine instance each time to avoid issues
-            speak_engine = pyttsx3.init()
-            speak_engine.say(current_sentence)
-            speak_engine.runAndWait()
-            # Explicitly stop and dispose of the engine
-            speak_engine.stop()
+        # Add the text to the TTS queue
+        tts_queue.put(current_sentence)
         
-        threading.Thread(target=speak).start()
+        # Start a new TTS thread if needed
+        if not tts_thread_running:
+            tts_thread = threading.Thread(target=tts_worker, daemon=True)
+            tts_thread.start()
     
     return jsonify({'status': 'speaking'})
 
@@ -420,6 +698,34 @@ def update_sentence():
     
     return jsonify({'status': 'updated', 'sentence': current_sentence})
 
+@app.route('/add_to_sentence', methods=['POST'])
+def add_to_sentence():
+    global current_sentence
+    
+    data = request.json
+    if 'char' in data:
+        char = data['char']
+        
+        # Handle special characters
+        if char == 'Backspace':
+            # Remove the last character from the sentence
+            if current_sentence:
+                current_sentence = current_sentence[:-1]
+        elif char == 'next':
+            # 'next' is a control gesture, not a character to add
+            pass
+        elif char != '-':
+            # Add regular characters to the sentence
+            current_sentence += char
+    
+    return jsonify({'status': 'added', 'sentence': current_sentence})
+
 if __name__ == '__main__':
+    # Create white image if it doesn't exist
+    if not os.path.exists('white.jpg'):
+        white = np.ones((400, 400, 3), dtype=np.uint8) * 255
+        cv2.imwrite('white.jpg', white)
+        print("Created white.jpg for hand landmark visualization")
+    
     # Run the app
     app.run(debug=True, host='0.0.0.0', port=5000)

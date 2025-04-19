@@ -53,4 +53,4 @@ document
 })
 
 // Start polling predictions
-setInterval(fetchPrediction, 1000)
+setInterval(fetchPrediction, 2000)

@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sign2Text Web App</title>
   <style>
     body {
@@ -9,6 +10,28 @@
       background: #f2f2f2;
       text-align: center;
       padding: 20px;
+      margin: 0;
+    }
+    .navbar {
+      background-color: #333;
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+    .navbar a {
+      float: left;
+      display: block;
+      color: white;
+      text-align: center;
+      padding: 14px 16px;
+      text-decoration: none;
+    }
+    .navbar a:hover {
+      background-color: #ddd;
+      color: black;
+    }
+    .navbar a.active {
+      background-color: #007BFF;
+      color: white;
     }
     h1 {
       color: #333;
@@ -39,13 +62,58 @@
       background-color: #007BFF;
       color: white;
       cursor: pointer;
+      transition: background-color 0.3s;
     }
     .btn:hover {
       background-color: #0056b3;
     }
+    .btn:active {
+      background-color: #004494;
+    }
+    .btn-speak {
+      background-color: #28a745;
+    }
+    .btn-speak:hover {
+      background-color: #218838;
+    }
+    .btn-clear {
+      background-color: #dc3545;
+    }
+    .btn-clear:hover {
+      background-color: #c82333;
+    }
+    .status-indicator {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-left: 5px;
+    }
+    .status-indicator.active {
+      background-color: #28a745;
+    }
+    .status-indicator.inactive {
+      background-color: #dc3545;
+    }
+    .detection-status {
+      font-size: 14px;
+      color: #666;
+      margin-top: 5px;
+    }
+    .add-char-btn {
+      background-color: #17a2b8;
+      margin-left: 10px;
+    }
+    .add-char-btn:hover {
+      background-color: #138496;
+    }
   </style>
 </head>
 <body>
+  <div class="navbar">
+    <a href="/" class="active">Home</a>
+    <a href="/chart">ASL Chart</a>
+  </div>
 
   <h1>Sign Language to Text</h1>
 
@@ -54,6 +122,11 @@
   <div id="output">
     <div class="box">
       <strong>Predicted Character:</strong> <span id="char">-</span>
+      <button class="btn add-char-btn" id="addChar">Add to Sentence</button>
+      <div class="detection-status">
+        Detection Status: <span id="detectionStatus">Waiting</span>
+        <span class="status-indicator" id="statusIndicator"></span>
+      </div>
     </div>
     <div class="box">
       <strong>Sentence:</strong> <span id="sentence"></span>
@@ -66,68 +139,154 @@
       <button class="btn" id="sug4"></button>
     </div>
     <div>
-      <button class="btn" id="speak">🔊 Speak</button>
-      <button class="btn" id="clear">🗑️ Clear</button>
+      <button class="btn btn-speak" id="speak">🔊 Speak</button>
+      <button class="btn btn-clear" id="clear">🗑️ Clear</button>
     </div>
   </div>
 
   <script>
-  // Update predictions every second
+  // Update predictions every 300ms for better responsiveness
   function fetchPrediction() {
     fetch("/get_prediction")
       .then((response) => response.json())
       .then((data) => {
-        document.getElementById("char").textContent = data.char || "-"
-        document.getElementById("sentence").textContent = data.sentence || ""
-        document.getElementById("sug1").textContent = data.suggestions[0] || ""
-        document.getElementById("sug2").textContent = data.suggestions[1] || ""
-        document.getElementById("sug3").textContent = data.suggestions[2] || ""
-        document.getElementById("sug4").textContent = data.suggestions[3] || ""
+        const prevChar = document.getElementById("char").textContent;
+        const newChar = data.char || "-";
+        
+        document.getElementById("char").textContent = newChar;
+        document.getElementById("sentence").textContent = data.sentence || "";
+        document.getElementById("sug1").textContent = data.suggestions[0] || "";
+        document.getElementById("sug2").textContent = data.suggestions[1] || "";
+        document.getElementById("sug3").textContent = data.suggestions[2] || "";
+        document.getElementById("sug4").textContent = data.suggestions[3] || "";
+        
+        // Update detection status
+        if (newChar !== prevChar && newChar !== "-") {
+          document.getElementById("detectionStatus").textContent = "Detected";
+          document.getElementById("statusIndicator").className = "status-indicator active";
+          
+          // Reset status after 1 second
+          setTimeout(() => {
+            document.getElementById("detectionStatus").textContent = "Waiting";
+            document.getElementById("statusIndicator").className = "status-indicator inactive";
+          }, 1000);
+        }
       })
       .catch((err) => console.error("Prediction fetch error:", err))
   }
 
+  // Add character button - directly add the current character to the sentence
+  document.getElementById("addChar").addEventListener("click", () => {
+    const char = document.getElementById("char").textContent;
+    if (char && char !== "-") {
+      fetch("/add_to_sentence", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ char: char })
+      })
+      .then(response => response.json())
+      .then(data => {
+        document.getElementById("sentence").textContent = data.sentence;
+        
+        // Update detection status to provide feedback
+        document.getElementById("detectionStatus").textContent = 
+          char === "Backspace" ? "Deleted character" : 
+          char === "next" ? "Next gesture detected" : 
+          "Added: " + char;
+        
+        document.getElementById("statusIndicator").className = "status-indicator active";
+        
+        // Reset status after 1 second
+        setTimeout(() => {
+          document.getElementById("detectionStatus").textContent = "Waiting";
+          document.getElementById("statusIndicator").className = "status-indicator inactive";
+        }, 1000);
+      });
+    }
+  });
+
   // Speak the sentence
   document.getElementById("speak").addEventListener("click", () => {
+    const speakBtn = document.getElementById("speak");
+    speakBtn.disabled = true;
+    speakBtn.textContent = "🔊 Speaking...";
+    
     fetch("/speak", { method: "POST" })
-  })
+      .then(response => response.json())
+      .then(data => {
+        // Re-enable button after a delay
+        setTimeout(() => {
+          speakBtn.disabled = false;
+          speakBtn.textContent = "🔊 Speak";
+        }, 1000);
+      })
+      .catch(err => {
+        console.error("Speech error:", err);
+        speakBtn.disabled = false;
+        speakBtn.textContent = "🔊 Speak";
+      });
+  });
 
   // Clear the sentence and UI
   document
     .getElementById("clear")
     .addEventListener("click", () => {
+      const clearBtn = document.getElementById("clear");
+      clearBtn.disabled = true;
+      
       fetch("/clear", { method: "POST" }).then(() => {
-        document.getElementById("char").textContent = "-"
-        document.getElementById("sentence").textContent = ""
+        document.getElementById("char").textContent = "-";
+        document.getElementById("sentence").textContent = "";
+        document.getElementById("detectionStatus").textContent = "Waiting";
+        document.getElementById("statusIndicator").className = "status-indicator inactive";
+        
         ;["sug1", "sug2", "sug3", "sug4"].forEach((id) => {
-          document.getElementById(id).textContent = ""
-        })
-      })
-    })
+          document.getElementById(id).textContent = "";
+        });
+        
+        // Re-enable button after a short delay
+        setTimeout(() => {
+          clearBtn.disabled = false;
+        }, 300);
+      });
+    });
 
   // Suggestion buttons: add selected word to sentence
   ;["sug1", "sug2", "sug3", "sug4"].forEach((id) => {
     document.getElementById(id).addEventListener("click", () => {
-      const word = document.getElementById(id).textContent
+      const word = document.getElementById(id).textContent;
       if (word) {
         fetch("/get_prediction")
           .then((response) => response.json())
           .then((data) => {
-            const sentence = data.sentence.trim()
-            const parts = sentence.split(" ")
-            parts[parts.length - 1] = word
-            const updated = parts.join(" ") + " "
-            fetch("/clear", { method: "POST" }).then(() => {
-              document.getElementById("sentence").textContent = updated
-              // Update on backend too (optional)
-            })
-          })
+            const sentence = data.sentence.trim();
+            const parts = sentence.split(" ");
+            parts[parts.length - 1] = word;
+            const updated = parts.join(" ") + " ";
+            
+            // Update UI immediately
+            document.getElementById("sentence").textContent = updated;
+            
+            // Update on backend
+            fetch("/update_sentence", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json"
+              },
+              body: JSON.stringify({ sentence: updated })
+            });
+          });
       }
-    })
-  })
+    });
+  });
 
+  // Initialize status indicator
+  document.getElementById("statusIndicator").className = "status-indicator inactive";
+  
   // Start polling predictions
-  setInterval(fetchPrediction, 1000)
+  setInterval(fetchPrediction, 300);  // Increased polling frequency for better responsiveness
   </script>
 </body>
 </html>
