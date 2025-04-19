@@ -60,7 +60,7 @@ The CNN model was trained on 180 skeleton images of ASL alphabets. To improve ac
 7. [X]
 8. [Y, J]
 
-This approach achieved a 97% accuracy rate, even with varying backgrounds and lighting conditions.
+This approach achieved a 88-95% accuracy rate, even with varying backgrounds and lighting conditions.
 
 ## Usage
 
@@ -114,9 +114,6 @@ The original research implemented:
 
 Their approach achieved 97% accuracy in recognizing ASL alphabets, even in varying conditions.
 
-## License
-
-[Include your license information here]
 
 ---
 
