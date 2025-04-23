@@ -109,7 +109,7 @@ This approach achieved a 88-95% accuracy rate, even with varying backgrounds and
 
 ## Credits and Acknowledgments
 
-This project is based on the work of Devansh Raval (19IT470) and Kelvin Parmar (19IT473) under the guidance of Dr. Nilesh B. Prajapati at Birla Vishvakarma Mahavidyalaya Engineering College, Information Technology Department.
+This project is based on the work of Devansh Raval (19IT470) and Kelvin Parmar (19IT473) under the guidance of Dr. Nilesh B. Prajapati at Birla Vishvakarma Mahavidyalaya Engineering College, Information Technology Department. 
 
 The original research implemented:
 - A CNN-based approach for sign language recognition
@@ -117,7 +117,7 @@ The original research implemented:
 - An innovative technique of drawing landmarks on a white background to overcome lighting and background issues
 
 Their approach achieved 97% accuracy in recognizing ASL alphabets, even in varying conditions.
-
+(https://github.com/Devansh-47/Sign-Language-To-Text-and-Speech-Conversion)
 
 ---
 
