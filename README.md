@@ -4,8 +4,6 @@
 
 Sign2Text is a web-based application that converts American Sign Language (ASL) gestures into text in real-time. The application uses computer vision and machine learning to detect hand gestures and translate them into corresponding letters and words, making communication more accessible for sign language users.
 
-![Sign2Text Demo](demo/demo-placeholder.gif)
-
 
 https://github.com/user-attachments/assets/586e05be-bebe-42f5-bd89-eb34b08cc399
 
@@ -110,7 +108,7 @@ This approach achieved a 88-95% accuracy rate, even with varying backgrounds and
 ## Credits and Acknowledgments
 
 This project is based on the work of Devansh Raval (19IT470) and Kelvin Parmar (19IT473) under the guidance of Dr. Nilesh B. Prajapati at Birla Vishvakarma Mahavidyalaya Engineering College, Information Technology Department. 
-(https://github.com/Devansh-47/Sign-Language-To-Text-and-Speech-Conversion)
+[Model Info](https://github.com/Devansh-47/Sign-Language-To-Text-and-Speech-Conversion)
 
 The original research implemented:
 - A CNN-based approach for sign language recognition
