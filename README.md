@@ -6,6 +6,10 @@ Sign2Text is a web-based application that converts American Sign Language (ASL) 
 
 ![Sign2Text Demo](demo/demo-placeholder.gif)
 
+
+https://github.com/user-attachments/assets/586e05be-bebe-42f5-bd89-eb34b08cc399
+
+
 ## Project Background
 
 More than 70 million deaf people around the world use sign languages to communicate. Sign language allows them to learn, work, access services, and be included in their communities. However, it's challenging to make everyone learn sign language to ensure people with disabilities can enjoy their rights on an equal basis with others.
